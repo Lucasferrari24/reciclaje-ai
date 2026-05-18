@@ -3,16 +3,19 @@ import { useDetection } from '../hooks/useDetection'
 import { VF_W, VF_H, VF_LEFT, VF_TOP, VF_RIGHT, VF_BOTTOM } from '../constants'
 import styles from './Camera.module.css'
 
-const FONT_LABEL = 'bold 13px Inter, sans-serif'
-const LERP = 0.28
+const FONT_LABEL    = 'bold 13px Inter, sans-serif'
+const LERP_MIN      = 0.30
+const LERP_MAX      = 0.72
+const GRACE_FRAMES  = 5   // frames que el box persiste cuando la detección desaparece momentáneamente
 
 export function Camera({ onDetections, isLocked = false }) {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
-  const lerpedRef = useRef([])   // posiciones interpoladas actuales
-  const targetRef = useRef([])   // posiciones objetivo (del modelo)
-  const rAFRef = useRef(null)
+  const lerpedRef  = useRef([])   // posiciones interpoladas actuales
+  const targetRef  = useRef([])   // posiciones objetivo (del modelo)
+  const graceRef   = useRef(0)    // contador de frames sin detección
+  const rAFRef     = useRef(null)
 
   const [cameras, setCameras] = useState([])
   const [cameraId, setCameraId] = useState('')
@@ -73,17 +76,30 @@ export function Camera({ onDetections, isLocked = false }) {
 
       // Interpolar posiciones
       if (targets.length === 0) {
-        lerpedRef.current = []
+        graceRef.current++
+        if (graceRef.current > GRACE_FRAMES) lerpedRef.current = []
+        // Si estamos en gracia, seguir lerpando hacia la última posición conocida
       } else {
+        graceRef.current = 0
         lerpedRef.current = targets.map(t => {
-          const prev = lerpedRef.current.find(b => b.cls === t.cls)
+          // Buscar el box previo más cercano (por centro) en lugar de por clase
+          const tcx = (t.x1 + t.x2) / 2, tcy = (t.y1 + t.y2) / 2
+          let prev = null, minD = Infinity
+          for (const b of lerpedRef.current) {
+            const d = Math.hypot((b.x1 + b.x2) / 2 - tcx, (b.y1 + b.y2) / 2 - tcy)
+            if (d < minD) { minD = d; prev = b }
+          }
           if (!prev) return { ...t }
+
+          // Lerp adaptativo: más rápido cuando el objeto se mueve rápido
+          const speed = Math.hypot(t.x1 - prev.x1, t.y1 - prev.y1)
+          const alpha = Math.min(LERP_MIN + speed * 0.0035, LERP_MAX)
           return {
             ...t,
-            x1: prev.x1 + (t.x1 - prev.x1) * LERP,
-            y1: prev.y1 + (t.y1 - prev.y1) * LERP,
-            x2: prev.x2 + (t.x2 - prev.x2) * LERP,
-            y2: prev.y2 + (t.y2 - prev.y2) * LERP,
+            x1: prev.x1 + (t.x1 - prev.x1) * alpha,
+            y1: prev.y1 + (t.y1 - prev.y1) * alpha,
+            x2: prev.x2 + (t.x2 - prev.x2) * alpha,
+            y2: prev.y2 + (t.y2 - prev.y2) * alpha,
           }
         })
       }
