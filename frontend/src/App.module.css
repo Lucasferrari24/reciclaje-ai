@@ -10,7 +10,7 @@
 .header {
   padding: 20px 0 18px;
   border-bottom: 1px solid #161b22;
-  margin-bottom: 24px;
+  margin-bottom: 0;
 }
 
 .headerInner {
@@ -33,9 +33,7 @@
   letter-spacing: 2px;
 }
 
-.logoAI {
-  color: #22c55e;
-}
+.logoAI { color: #22c55e; }
 
 .header p {
   font-size: 12px;
@@ -44,6 +42,47 @@
   letter-spacing: 0.3px;
 }
 
+/* Puntos en el header */
+.pointsBadge {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #1c1007;
+  border: 1px solid #92400e;
+  border-radius: 10px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.pointsBadge:hover { border-color: #fbbf24; }
+.pointsNum   { font-size: 18px; font-weight: 800; color: #fbbf24; line-height: 1; }
+.pointsLabel { font-size: 9px;  font-weight: 600; color: #92400e; text-transform: uppercase; letter-spacing: .08em; }
+
+/* Navegación */
+.nav {
+  display: flex;
+  gap: 4px;
+  padding: 12px 0;
+  border-bottom: 1px solid #161b22;
+  margin-bottom: 20px;
+}
+
+.navBtn {
+  padding: 7px 18px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .15s;
+}
+.navBtn:hover  { color: #d1d5db; background: #1a1a2e; }
+.navActive     { border-color: #22c55e44; background: #0d2818; color: #22c55e; font-weight: 600; }
+
+/* Layout escáner */
 .main {
   display: grid;
   grid-template-columns: 1fr 340px;
@@ -70,6 +109,21 @@
   letter-spacing: 1px;
   color: #6b7280;
 }
+
+/* Botón "¿Dónde lo tiro?" */
+.btnReciclar {
+  background: #22c55e;
+  color: #000;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background .15s;
+  width: 100%;
+}
+.btnReciclar:hover { background: #16a34a; }
 
 .legend {
   background: #161b22;
@@ -109,8 +163,92 @@
   opacity: 0.85;
 }
 
+/* Layout mapa/perfil (full width) */
+.fullSection {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tokenBanner {
+  background: #1c1007;
+  border: 1px solid #92400e;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: #fbbf24;
+}
+
+/* Perfil */
+.profileCard {
+  background: #0f0f1a;
+  border: 1px solid #1e2d40;
+  border-radius: 14px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.profilePoints {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.profileNum   { font-size: 56px; font-weight: 800; color: #fbbf24; line-height: 1; }
+.profileLabel { font-size: 13px; color: #6b7280; }
+
+.canjesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.canje {
+  background: #1a1a2e;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.canjeNum  { font-size: 16px; font-weight: 700; color: #22c55e; }
+.canjeDesc { font-size: 11px; color: #64748b; }
+
+.historial h3 {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: #6b7280;
+  margin-bottom: 10px;
+}
+
+.histRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #0f0f1a;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.histMaterial { font-weight: 600; color: #22c55e; font-size: 13px; text-transform: capitalize; min-width: 80px; }
+.histPunto    { flex: 1; font-size: 12px; color: #94a3b8; }
+.histPts      { font-weight: 700; color: #fbbf24; font-size: 13px; }
+.histFecha    { font-size: 11px; color: #475569; }
+
+.emptyHistory {
+  color: #4b5563;
+  font-size: 13px;
+  text-align: center;
+  padding: 40px 20px;
+}
+
 @media (max-width: 900px) {
-  .main {
-    grid-template-columns: 1fr;
-  }
+  .main { grid-template-columns: 1fr; }
 }
