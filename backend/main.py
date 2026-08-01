@@ -23,7 +23,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Reciclaje AI", lifespan=lifespan)
 
-_default_origins = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174"
+_default_origins = (
+    "http://localhost:5173,"
+    "http://127.0.0.1:5173,"
+    "http://localhost:5174,"
+    "https://reciclaje-ai.vercel.app"
+)
 _allowed_origins = os.getenv("ALLOWED_ORIGINS", _default_origins).split(",")
 
 app.add_middleware(
