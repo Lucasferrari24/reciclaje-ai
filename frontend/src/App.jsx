@@ -4,9 +4,11 @@ import { ClassInfo }    from './components/ClassInfo'
 import { DatasetStats } from './components/DatasetStats'
 import { RecyclingMap } from './components/RecyclingMap'
 import { DepositFlow }  from './components/DepositFlow'
+import { Dashboard }    from './components/Dashboard'
 import { RecycleIcon, CLASS_ICONS } from './icons'
 import { FRAME_W, FRAME_H } from './constants'
 import { usePoints }    from './hooks/usePoints'
+import { CO2_POR_MATERIAL } from './data/puntosVerdes.js'
 import styles from './App.module.css'
 
 // ── Tracker constants ─────────────────────────────────────────────────────────
@@ -43,7 +45,7 @@ function pickBest(cs) {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [screen,       setScreen]       = useState('scan')  // 'scan' | 'mapa' | 'perfil'
+  const [screen,       setScreen]       = useState('scan')  // 'scan' | 'mapa' | 'perfil' | 'panel'
   const [topDetection, setTopDetection] = useState(null)
   const [isLocked,     setIsLocked]     = useState(false)
   const [depositPunto, setDepositPunto] = useState(null)    // punto verde seleccionado para depósito
@@ -130,8 +132,8 @@ export default function App() {
         <div className={styles.headerInner}>
           <div className={styles.logo}><RecycleIcon /></div>
           <div>
-            <h1>RECICLAJE <span className={styles.logoAI}>AI</span></h1>
-            <p>Sistema de detección de residuos en tiempo real</p>
+            <h1>SCRAP <span className={styles.logoAI}>2.0</span></h1>
+            <p>Clasificación de residuos con IA · Rosario</p>
           </div>
           <div className={styles.pointsBadge} onClick={() => setScreen('perfil')}>
             <span className={styles.pointsNum}>{points}</span>
@@ -146,10 +148,11 @@ export default function App() {
           { id: 'scan',   label: 'Escáner' },
           { id: 'mapa',   label: 'Puntos verdes' },
           { id: 'perfil', label: 'Mi perfil' },
+          { id: 'panel',  label: '⚙ Panel municipal' },
         ].map(t => (
           <button
             key={t.id}
-            className={`${styles.navBtn} ${screen === t.id ? styles.navActive : ''}`}
+            className={`${styles.navBtn} ${screen === t.id ? styles.navActive : ''} ${t.id === 'panel' ? styles.navPanel : ''}`}
             onClick={() => { setDepositPunto(null); setScreen(t.id) }}
           >
             {t.label}
@@ -230,48 +233,118 @@ export default function App() {
         )}
 
         {/* ── PERFIL ── */}
-        {screen === 'perfil' && (
-          <div className={styles.fullSection}>
-            <div className={styles.profileCard}>
-              <div className={styles.profilePoints}>
-                <span className={styles.profileNum}>{points}</span>
-                <span className={styles.profileLabel}>puntos acumulados</span>
-              </div>
-              <div className={styles.canjesGrid}>
-                <div className={styles.canje}>
-                  <span className={styles.canjeNum}>100 pts</span>
-                  <span className={styles.canjeDesc}>1 viaje en colectivo SEMTUR</span>
-                </div>
-                <div className={styles.canje}>
-                  <span className={styles.canjeNum}>500 pts</span>
-                  <span className={styles.canjeDesc}>Descuento en comercio adherido</span>
-                </div>
-                <div className={styles.canje}>
-                  <span className={styles.canjeNum}>2000 pts</span>
-                  <span className={styles.canjeDesc}>10% descuento en ABL municipal</span>
-                </div>
-              </div>
-            </div>
-
-            {history.length > 0 && (
-              <div className={styles.historial}>
-                <h3>Historial</h3>
-                {history.map((e, i) => (
-                  <div key={i} className={styles.histRow}>
-                    <span className={styles.histMaterial}>{e.material}</span>
-                    <span className={styles.histPunto}>{e.punto}</span>
-                    <span className={styles.histPts}>+{e.amount} pts</span>
-                    <span className={styles.histFecha}>{new Date(e.fecha).toLocaleDateString('es-AR')}</span>
+        {screen === 'perfil' && (() => {
+          const co2Total = history.reduce((acc, e) => acc + (CO2_POR_MATERIAL[e.material] ?? 0.1), 0)
+          const totalItems = history.length
+          const nivel = points < 50 ? { nombre: 'Semilla', next: 50 }
+            : points < 200 ? { nombre: 'Reciclador', next: 200 }
+            : points < 500 ? { nombre: 'Eco-Guardián', next: 500 }
+            : points < 1500 ? { nombre: 'Héroe Verde', next: 1500 }
+            : { nombre: 'Maestro del Reciclaje', next: null }
+          const logros = [
+            { id: 'primer',   label: 'Primera vez',       desc: 'Tu primer reciclaje',        ok: totalItems >= 1,  icon: '🌱' },
+            { id: 'x5',       label: 'Constante',         desc: '5 reciclajes',                ok: totalItems >= 5,  icon: '♻️' },
+            { id: 'vidrio',   label: 'Cristal limpio',    desc: 'Reciclaste vidrio',           ok: history.some(h => h.material === 'vidrio'),   icon: '🫙' },
+            { id: 'metal',    label: 'Metal hero',        desc: 'Reciclaste metal',            ok: history.some(h => h.material === 'metal'),    icon: '🥫' },
+            { id: 'co2',      label: 'Eco warrior',       desc: '1 kg de CO₂ ahorrado',       ok: co2Total >= 1,    icon: '🌍' },
+            { id: 'pts100',   label: 'Centenario',        desc: '100 puntos acumulados',       ok: points >= 100,    icon: '⭐' },
+          ]
+          return (
+            <div className={styles.fullSection}>
+              {/* Cabecera del perfil */}
+              <div className={styles.profileCard}>
+                <div className={styles.profileTop}>
+                  <div className={styles.profilePoints}>
+                    <span className={styles.profileNum}>{points}</span>
+                    <span className={styles.profileLabel}>puntos acumulados</span>
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className={styles.profileStats}>
+                    <div className={styles.profileStat}>
+                      <span className={styles.statVal}>{totalItems}</span>
+                      <span className={styles.statLbl}>Reciclajes</span>
+                    </div>
+                    <div className={styles.profileStat}>
+                      <span className={styles.statVal} style={{ color: '#22c55e' }}>{co2Total.toFixed(2)} kg</span>
+                      <span className={styles.statLbl}>CO₂ ahorrado</span>
+                    </div>
+                    <div className={styles.profileStat}>
+                      <span className={styles.statVal} style={{ color: '#a78bfa' }}>{nivel.nombre}</span>
+                      <span className={styles.statLbl}>Nivel</span>
+                    </div>
+                  </div>
+                </div>
 
-            {history.length === 0 && (
-              <p className={styles.emptyHistory}>
-                Todavía no confirmaste ningún depósito. Escaneá un objeto y buscá el punto verde más cercano.
-              </p>
-            )}
+                {nivel.next && (
+                  <div className={styles.nivelProgress}>
+                    <div className={styles.nivelLabel}>
+                      <span>Progreso al siguiente nivel</span>
+                      <span>{points}/{nivel.next} pts</span>
+                    </div>
+                    <div className={styles.nivelTrack}>
+                      <div className={styles.nivelFill} style={{ width: `${Math.min(100, points / nivel.next * 100)}%` }} />
+                    </div>
+                  </div>
+                )}
+
+                <div className={styles.canjesGrid}>
+                  <div className={styles.canje}>
+                    <span className={styles.canjeNum}>100 pts</span>
+                    <span className={styles.canjeDesc}>1 viaje en colectivo SEMTUR</span>
+                  </div>
+                  <div className={styles.canje}>
+                    <span className={styles.canjeNum}>500 pts</span>
+                    <span className={styles.canjeDesc}>Descuento en comercio adherido</span>
+                  </div>
+                  <div className={styles.canje}>
+                    <span className={styles.canjeNum}>2000 pts</span>
+                    <span className={styles.canjeDesc}>10% descuento en ABL municipal</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Logros */}
+              <div className={styles.logrosSection}>
+                <h3 className={styles.logrosTitle}>Logros</h3>
+                <div className={styles.logrosGrid}>
+                  {logros.map(l => (
+                    <div key={l.id} className={`${styles.logro} ${l.ok ? styles.logroOk : styles.logroPending}`}>
+                      <span className={styles.logroIcon}>{l.icon}</span>
+                      <span className={styles.logroLabel}>{l.label}</span>
+                      <span className={styles.logroDesc}>{l.desc}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Historial */}
+              {history.length > 0 && (
+                <div className={styles.historial}>
+                  <h3>Historial</h3>
+                  {history.map((e, i) => (
+                    <div key={i} className={styles.histRow}>
+                      <span className={styles.histMaterial}>{e.material}</span>
+                      <span className={styles.histPunto}>{e.punto}</span>
+                      <span className={styles.histPts}>+{e.amount} pts</span>
+                      <span className={styles.histCo2}>-{(CO2_POR_MATERIAL[e.material] ?? 0.1).toFixed(2)} kg CO₂</span>
+                      <span className={styles.histFecha}>{new Date(e.fecha).toLocaleDateString('es-AR')}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {history.length === 0 && (
+                <p className={styles.emptyHistory}>
+                  Todavía no confirmaste ningún depósito. Escaneá un objeto y buscá el punto verde más cercano.
+                </p>
+              )}
+            </div>
+          )
+        })()}
+
+        {/* ── PANEL MUNICIPAL ── */}
+        {screen === 'panel' && (
+          <div className={styles.fullSection}>
+            <Dashboard />
           </div>
         )}
       </main>

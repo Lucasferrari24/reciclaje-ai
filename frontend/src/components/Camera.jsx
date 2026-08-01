@@ -20,7 +20,7 @@ export function Camera({ onDetections, isLocked = false }) {
   const [cameras, setCameras] = useState([])
   const [cameraId, setCameraId] = useState('')
   const isLockedRef = useRef(false)
-  const { detections, connected, latency, fps, reconnect } = useDetection(videoRef)
+  const { detections, connected, demoMode, latency, fps, reconnect } = useDetection(videoRef)
 
   // Mantener ref sincronizada para que el rAF loop pueda leerla
   isLockedRef.current = isLocked
@@ -203,8 +203,8 @@ export function Camera({ onDetections, isLocked = false }) {
         <video ref={videoRef} autoPlay playsInline muted className={styles.video} />
         <canvas ref={canvasRef} width={1280} height={720} className={styles.canvas} />
 
-        <div className={`${styles.badge} ${connected ? styles.on : styles.off}`}>
-          {connected ? 'Conectado' : 'Desconectado'}
+        <div className={`${styles.badge} ${connected ? (demoMode ? styles.demo : styles.on) : styles.off}`}>
+          {connected ? (demoMode ? 'Modo Demo' : 'Conectado') : 'Conectando...'}
         </div>
 
         {connected && (

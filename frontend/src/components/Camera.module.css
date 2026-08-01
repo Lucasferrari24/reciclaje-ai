@@ -53,6 +53,12 @@
   border: 1px solid rgba(239, 68, 68, 0.4);
 }
 
+.demo {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
 /* Stats FPS / latencia */
 .stats {
   position: absolute;
