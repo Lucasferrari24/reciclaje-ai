@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 
-const WS_URL            = import.meta.env.VITE_WS_URL ?? 'ws://localhost:8001/ws/detect'
+const WS_URL = localStorage.getItem('scrap_ws_url')
+  ?? import.meta.env.VITE_WS_URL
+  ?? 'ws://localhost:8001/ws/detect'
 const FRAME_INTERVAL_MS = 100
 const JPEG_QUALITY      = 0.92
 const SEND_WIDTH        = 640

@@ -2,101 +2,134 @@ import { useEffect, useState, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { PUNTOS_VERDES, estadoContenedor } from '../data/puntosVerdes.js'
+import { PUNTOS_VERDES, estadoContenedor, tipoBadge, distKm } from '../data/puntosVerdes.js'
+import { CATEGORIAS } from '../data/categorias.js'
 import styles from './RecyclingMap.module.css'
 
 delete L.Icon.Default.prototype._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+
+const USER_ICON = new L.DivIcon({
+  html: `<div style="width:20px;height:20px;border-radius:50%;background:#22c55e;border:3px solid #fff;box-shadow:0 0 10px #22c55e88"></div>`,
+  className: '',
+  iconSize: [20, 20],
+  iconAnchor: [10, 10],
 })
 
-const USER_ICON = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34],
-})
-
-function makeCapIcon(capacidad) {
-  const e = estadoContenedor(capacidad)
-  const color = e === 'lleno' ? '#ef4444' : e === 'por_llenarse' ? '#f59e0b' : '#22c55e'
+function makeMarkerIcon(punto) {
+  const tb    = tipoBadge(punto.tipo)
+  const e     = estadoContenedor(punto.capacidad)
+  const color = e === 'lleno' ? '#ef4444' : e === 'por_llenarse' ? '#f59e0b' : tb.color
   return new L.DivIcon({
-    html: `<div style="position:relative;width:28px;height:40px">
-      <svg viewBox="0 0 28 40" xmlns="http://www.w3.org/2000/svg">
-        <path d="M14 0C6.27 0 0 6.27 0 14c0 9.33 14 26 14 26S28 23.33 28 14C28 6.27 21.73 0 14 0z" fill="${color}"/>
-        <circle cx="14" cy="14" r="8" fill="white" opacity="0.9"/>
-        <text x="14" y="18" text-anchor="middle" font-size="9" font-weight="bold" fill="${color}">${capacidad}%</text>
-      </svg>
-    </div>`,
+    html: `<div style="
+      width:32px;height:32px;border-radius:50%;
+      background:${color};border:2px solid #fff;
+      display:flex;align-items:center;justify-content:center;
+      font-size:14px;box-shadow:0 2px 6px ${color}66
+    ">${punto.tipo==='raee'?'💻':punto.tipo==='voluminoso'?'🛋️':punto.tipo==='toxico'?'⚠️':'♻️'}</div>`,
     className: '',
-    iconSize: [28, 40],
-    iconAnchor: [14, 40],
-    popupAnchor: [0, -40],
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -18],
   })
-}
-
-function distKm(lat1, lng1, lat2, lng2) {
-  const R  = 6371
-  const dL = (lat2 - lat1) * Math.PI / 180
-  const dG = (lng2 - lng1) * Math.PI / 180
-  const a  = Math.sin(dL/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dG/2)**2
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
 }
 
 function FlyTo({ center }) {
   const map = useMap()
-  useEffect(() => { if (center) map.flyTo(center, 15, { duration: 1.2 }) }, [center, map])
+  useEffect(() => { if (center) map.flyTo(center, 15, { duration: 1 }) }, [center, map])
   return null
 }
 
-export function RecyclingMap({ materialFiltro, onSeleccionar }) {
+export function RecyclingMap({ categoriaFiltro, onSeleccionar }) {
   const [userPos,   setUserPos]   = useState(null)
   const [flyTarget, setFlyTarget] = useState(null)
   const [selected,  setSelected]  = useState(null)
+  const [geoError,  setGeoError]  = useState(false)
   const ROSARIO = [-32.9468, -60.6393]
 
+  // Auto-geolocalización al montar
   useEffect(() => {
-    navigator.geolocation?.getCurrentPosition(
-      pos => setUserPos([pos.coords.latitude, pos.coords.longitude]),
-      () => {}
+    if (!navigator.geolocation) { setGeoError(true); return }
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const coords = [pos.coords.latitude, pos.coords.longitude]
+        setUserPos(coords)
+      },
+      () => setGeoError(true),
+      { timeout: 8000, maximumAge: 60000 }
     )
   }, [])
 
+  // Filtrar puntos por tipo de categoría
+  const cat = categoriaFiltro ? CATEGORIAS[categoriaFiltro] : null
+  const tipoPunto = cat?.tipoPunto ?? null
+
   const puntos = PUNTOS_VERDES
-    .filter(p => !materialFiltro || p.materiales.includes(materialFiltro))
+    .filter(p => {
+      if (!tipoPunto) return true
+      if (tipoPunto === 'verde') return p.tipo === 'verde'
+      return p.tipo === tipoPunto
+    })
+    .filter(p => {
+      if (!categoriaFiltro) return true
+      return p.materiales.includes(categoriaFiltro) || p.tipo === tipoPunto
+    })
     .map(p => ({
       ...p,
       dist: userPos ? distKm(userPos[0], userPos[1], p.lat, p.lng) : null,
     }))
     .sort((a, b) => (a.dist ?? 999) - (b.dist ?? 999))
 
-  const cercanos = puntos.slice(0, 3)
+  // Auto-seleccionar el más cercano cuando llega la ubicación
+  useEffect(() => {
+    if (userPos && puntos.length > 0 && !selected) {
+      const nearest = puntos[0]
+      setSelected(nearest)
+      setFlyTarget([nearest.lat, nearest.lng])
+    }
+  }, [userPos]) // eslint-disable-line
 
   const irAqui = (punto) => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${punto.lat},${punto.lng}&travelmode=walking`
-    window.open(url, '_blank')
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${punto.lat},${punto.lng}&travelmode=walking`, '_blank')
+  }
+
+  const handleSelect = (punto) => {
+    setSelected(punto)
+    setFlyTarget([punto.lat, punto.lng])
   }
 
   return (
     <div className={styles.wrap}>
-      {/* Lista lateral de puntos más cercanos */}
+      {/* Sidebar */}
       <div className={styles.sidebar}>
         <p className={styles.sideTitle}>
-          {materialFiltro ? `Puntos para: ${materialFiltro}` : 'Puntos verdes cercanos'}
+          {categoriaFiltro && cat ? `Puntos para: ${cat.nombre}` : 'Puntos de descarte cercanos'}
+          {userPos && <span className={styles.geoOk}> · Ubicación activa</span>}
+          {geoError && <span className={styles.geoErr}> · Sin ubicación</span>}
         </p>
-        {cercanos.map((p, i) => {
-          const e = estadoContenedor(p.capacidad)
+
+        {puntos.length === 0 && (
+          <p className={styles.noPoints}>No hay puntos disponibles para esta categoría.</p>
+        )}
+
+        {puntos.slice(0, 5).map((p, i) => {
+          const tb    = tipoBadge(p.tipo)
+          const e     = estadoContenedor(p.capacidad)
           const capColor = e === 'lleno' ? '#ef4444' : e === 'por_llenarse' ? '#f59e0b' : '#22c55e'
+          const isNear   = i === 0 && userPos
           return (
             <div
               key={p.id}
               className={`${styles.puntoCard} ${selected?.id === p.id ? styles.activo : ''}`}
-              onClick={() => { setSelected(p); setFlyTarget([p.lat, p.lng]) }}
+              onClick={() => handleSelect(p)}
             >
-              <div className={styles.puntoBadge}>{i === 0 ? '⬤ MÁS CERCANO' : `⬤ ${p.dist ? p.dist.toFixed(1)+'km' : ''}`}</div>
+              {isNear && <div className={styles.nearestBadge}>📍 Más cercano</div>}
+              <div className={styles.puntoHead}>
+                <span className={styles.tipoBadge} style={{ color: tb.color, borderColor: tb.color + '44', background: tb.color + '11' }}>{tb.label}</span>
+                {p.dist && <span className={styles.dist}>{p.dist < 1 ? `${Math.round(p.dist * 1000)} m` : `${p.dist.toFixed(1)} km`}</span>}
+              </div>
               <div className={styles.puntoNombre}>{p.nombre}</div>
               <div className={styles.puntoDireccion}>{p.direccion}</div>
+
               <div className={styles.capRow}>
                 <div className={styles.capTrack}>
                   <div className={styles.capFill} style={{ width: `${p.capacidad}%`, background: capColor }} />
@@ -104,14 +137,12 @@ export function RecyclingMap({ materialFiltro, onSeleccionar }) {
                 <span className={styles.capLabel} style={{ color: capColor }}>{p.capacidad}%</span>
               </div>
               <div className={styles.horario}>{p.horario}</div>
-              <div className={styles.puntoMateriales}>
-                {p.materiales.map(m => <span key={m} className={styles.chip}>{m}</span>)}
-              </div>
+
               <div className={styles.puntoActions}>
-                <button className={styles.btnIr}    onClick={ev => { ev.stopPropagation(); irAqui(p) }}>Cómo llegar</button>
-                {onSeleccionar && (
+                <button className={styles.btnIr} onClick={ev => { ev.stopPropagation(); irAqui(p) }}>Cómo llegar</button>
+                {onSeleccionar && p.tipo === 'verde' && (
                   <button className={styles.btnSelect} onClick={ev => { ev.stopPropagation(); onSeleccionar(p) }}>
-                    Confirmar depósito aquí
+                    Confirmar aquí
                   </button>
                 )}
               </div>
@@ -124,7 +155,7 @@ export function RecyclingMap({ materialFiltro, onSeleccionar }) {
       <div className={styles.mapWrap}>
         <MapContainer center={userPos ?? ROSARIO} zoom={13} className={styles.map}>
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            attribution='&copy; OpenStreetMap'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           {flyTarget && <FlyTo center={flyTarget} />}
@@ -134,27 +165,26 @@ export function RecyclingMap({ materialFiltro, onSeleccionar }) {
               <Marker position={userPos} icon={USER_ICON}>
                 <Popup>Tu ubicación</Popup>
               </Marker>
-              <Circle center={userPos} radius={1500} pathOptions={{ color: '#22c55e', fillOpacity: 0.05 }} />
+              <Circle center={userPos} radius={1500} pathOptions={{ color: '#22c55e', fillOpacity: 0.04, weight: 1 }} />
             </>
           )}
 
           {puntos.map(p => {
-            const e = estadoContenedor(p.capacidad)
-            const capColor = e === 'lleno' ? '#ef4444' : e === 'por_llenarse' ? '#f59e0b' : '#22c55e'
+            const tb = tipoBadge(p.tipo)
+            const e  = estadoContenedor(p.capacidad)
+            const capColor = e === 'lleno' ? '#ef4444' : e === 'por_llenarse' ? '#f59e0b' : tb.color
             return (
               <Marker
                 key={p.id}
                 position={[p.lat, p.lng]}
-                icon={makeCapIcon(p.capacidad)}
-                eventHandlers={{ click: () => { setSelected(p); setFlyTarget([p.lat, p.lng]) } }}
+                icon={makeMarkerIcon(p)}
+                eventHandlers={{ click: () => handleSelect(p) }}
               >
                 <Popup>
                   <strong>{p.nombre}</strong><br />
                   {p.direccion}<br />
-                  <small style={{ color: capColor }}>Capacidad: {p.capacidad}% · {e === 'disponible' ? 'Disponible' : e === 'por_llenarse' ? 'Por llenarse' : '⚠ LLENO'}</small><br />
-                  <small>{p.horario}</small><br />
-                  <small>{p.materiales.join(' · ')}</small><br />
-                  {p.dist && <small>~{p.dist.toFixed(1)} km de vos</small>}
+                  <span style={{ color: capColor }}>Ocupación: {p.capacidad}%</span><br />
+                  <small>{p.horario}</small>
                 </Popup>
               </Marker>
             )

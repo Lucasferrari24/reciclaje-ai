@@ -3,12 +3,30 @@ import { useDetection } from '../hooks/useDetection'
 import { VF_W, VF_H, VF_LEFT, VF_TOP, VF_RIGHT, VF_BOTTOM } from '../constants'
 import styles from './Camera.module.css'
 
+// Ícono expand SVG inline (más claro que un emoji)
+function IconExpand() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+      <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+      <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+    </svg>
+  )
+}
+function IconCollapse() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+      <polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/>
+      <line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/>
+    </svg>
+  )
+}
+
 const FONT_LABEL    = 'bold 13px Inter, sans-serif'
 const LERP_MIN      = 0.30
 const LERP_MAX      = 0.72
 const GRACE_FRAMES  = 5   // frames que el box persiste cuando la detección desaparece momentáneamente
 
-export function Camera({ onDetections, isLocked = false }) {
+export function Camera({ onDetections, isLocked = false, highConfDetection = null, classInfo = null, onReciclar = null }) {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
@@ -17,9 +35,16 @@ export function Camera({ onDetections, isLocked = false }) {
   const graceRef   = useRef(0)    // contador de frames sin detección
   const rAFRef     = useRef(null)
 
-  const [cameras, setCameras] = useState([])
+  const [cameras,  setCameras]  = useState([])
   const [cameraId, setCameraId] = useState('')
+  const [isFull,   setIsFull]   = useState(false)
   const isLockedRef = useRef(false)
+
+  // Bloquea el scroll del body cuando está en fullscreen
+  useEffect(() => {
+    document.body.style.overflow = isFull ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [isFull])
   const { detections, connected, demoMode, latency, fps, reconnect } = useDetection(videoRef)
 
   // Mantener ref sincronizada para que el rAF loop pueda leerla
@@ -197,12 +222,37 @@ export function Camera({ onDetections, isLocked = false }) {
     return () => cancelAnimationFrame(rAFRef.current)
   }, [])
 
+  // Info a mostrar en la barra inferior fullscreen
+  const barInfo = highConfDetection ?? classInfo
+
   return (
     <div className={styles.container}>
-      <div className={styles.wrapper}>
+      <div className={`${styles.wrapper} ${isFull ? styles.wrapperFull : ''}`}>
         <video ref={videoRef} autoPlay playsInline muted className={styles.video} />
         <canvas ref={canvasRef} width={1280} height={720} className={styles.canvas} />
 
+        {/* ── Overlay de alta confianza (≥ 95%) ────────────────────────── */}
+        {highConfDetection && (
+          <div
+            key={highConfDetection.catId}
+            className={styles.highConfOverlay}
+            style={{ '--hc': highConfDetection.color }}
+          >
+            <div className={styles.hcEmoji}>{highConfDetection.emoji}</div>
+            <div className={styles.hcConf} style={{ color: highConfDetection.color }}>
+              {Math.round(highConfDetection.conf * 100)}%
+            </div>
+            <div className={styles.hcNombre}>{highConfDetection.nombre.toUpperCase()}</div>
+            <div className={styles.hcContenedor}>{highConfDetection.contenedor}</div>
+            {highConfDetection.puntos > 0 && (
+              <div className={styles.hcReward}>
+                +{highConfDetection.puntos} pts · -{highConfDetection.co2} kg CO₂
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Badge estado — siempre encima */}
         <div className={`${styles.badge} ${connected ? (demoMode ? styles.demo : styles.on) : styles.off}`}>
           {connected ? (demoMode ? 'Modo Demo' : 'Conectado') : 'Conectando...'}
         </div>
@@ -214,26 +264,79 @@ export function Camera({ onDetections, isLocked = false }) {
             <span>{latency} <small>ms</small></span>
           </div>
         )}
+
+        {/* ── Botón expandir (solo cuando NO está fullscreen) ── */}
+        {!isFull && (
+          <button
+            className={styles.expandBtn}
+            onClick={() => setIsFull(true)}
+            title="Pantalla completa"
+          >
+            <IconExpand />
+          </button>
+        )}
+
+        {/* ── Botón cerrar fullscreen ── */}
+        {isFull && (
+          <button
+            className={styles.closeFullBtn}
+            onClick={() => setIsFull(false)}
+            title="Cerrar"
+          >
+            <IconCollapse />
+          </button>
+        )}
+
+        {/* ── Barra inferior en fullscreen (detección activa) ── */}
+        {isFull && (
+          <div className={styles.fullBar}>
+            {barInfo ? (
+              <div className={styles.fullBarRow}>
+                <span className={styles.fullBarEmoji}>{barInfo.emoji}</span>
+                <div className={styles.fullBarMeta}>
+                  <span className={styles.fullBarNombre} style={{ color: barInfo.color }}>
+                    {barInfo.nombre.toUpperCase()}
+                  </span>
+                  <span className={styles.fullBarConf}>
+                    {Math.round(barInfo.conf * 100)}% · {barInfo.contenedor}
+                  </span>
+                </div>
+                {onReciclar && (
+                  <button className={styles.fullBarBtn} onClick={onReciclar}>
+                    Ver dónde →
+                  </button>
+                )}
+              </div>
+            ) : (
+              <span className={styles.fullBarEmpty}>
+                Centrá el objeto en el visor
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
-      <div className={styles.controls}>
-        {cameras.length > 1 && (
-          <select
-            className={styles.select}
-            value={cameraId}
-            onChange={(e) => setCameraId(e.target.value)}
-          >
-            {cameras.map((cam, i) => (
-              <option key={cam.deviceId} value={cam.deviceId}>
-                {cam.label || `Cámara ${i + 1}`}
-              </option>
-            ))}
-          </select>
-        )}
-        <button className={styles.resetBtn} onClick={reconnect}>
-          Reiniciar detección
-        </button>
-      </div>
+      {/* Controles debajo (ocultos en fullscreen) */}
+      {!isFull && (
+        <div className={styles.controls}>
+          {cameras.length > 1 && (
+            <select
+              className={styles.select}
+              value={cameraId}
+              onChange={(e) => setCameraId(e.target.value)}
+            >
+              {cameras.map((cam, i) => (
+                <option key={cam.deviceId} value={cam.deviceId}>
+                  {cam.label || `Cámara ${i + 1}`}
+                </option>
+              ))}
+            </select>
+          )}
+          <button className={styles.resetBtn} onClick={reconnect}>
+            Reiniciar detección
+          </button>
+        </div>
+      )}
     </div>
   )
 }
