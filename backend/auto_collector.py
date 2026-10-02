@@ -1,3 +1,4 @@
+import os
 import cv2
 import time
 import numpy as np
@@ -7,7 +8,13 @@ DATASET_DIR  = Path("dataset")
 IMAGES_DIR   = DATASET_DIR / "images"
 LABELS_DIR   = DATASET_DIR / "labels"
 
-MIN_CONF      = 0.85   # confianza mínima para guardar
+# La auto-recoleccion viene APAGADA. Con el modelo actual guarda falsos positivos
+# (una persona frente a la camara entra como 'paper' con conf 0.9) y termina
+# entrenando contra datos erroneos, ademas de archivar frames de la webcam.
+# Encender a conciencia con AUTO_COLLECT=1 y revisar lo recolectado antes de entrenar.
+ENABLED       = os.getenv("AUTO_COLLECT", "0") == "1"
+
+MIN_CONF      = 0.90   # confianza mínima para guardar
 RATE_LIMIT_S  = 3.0    # segundos mínimos entre saves de la misma clase
 MAX_PER_CLASS = 300    # tope por clase para mantener balance
 MIN_READY     = 100    # total de muestras para considerarse "listo para entrenar"
@@ -53,7 +60,7 @@ class AutoCollector:
 
     def try_save(self, frame: np.ndarray, detections: list[dict]) -> int:
         """Guarda el frame si hay detecciones válidas. Devuelve cuántas clases se guardaron."""
-        if not detections:
+        if not ENABLED or not detections:
             return 0
 
         now = time.time()
@@ -93,6 +100,7 @@ class AutoCollector:
             "total": total,
             "max_per_class": MAX_PER_CLASS,
             "ready": total >= MIN_READY,
+            "enabled": ENABLED,
         }
 
     def reset(self):

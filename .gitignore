@@ -28,3 +28,6 @@ frontend/.env.production.local
 *.log
 .DS_Store
 Thumbs.db
+
+# Modelo exportado (se regenera con backend/export_onnx.py)
+backend/Modelos/*.onnx

@@ -136,9 +136,44 @@ Aprenden mientras usan. Gamificación que convierte el reciclaje en un hábito, 
 
 ### Detalles técnicos
 
-- 🔁 **Auto-reentrenamiento:** cada detección con confianza ≥ 85% se guarda automáticamente con su anotación YOLO. El dataset crece mientras la gente usa la app.
-- ⚡ **Latencia:** el frontend captura y envía frames a 640px de ancho cada 100ms. Latencia típica: 18–45ms en local.
+- ⚡ **Latencia:** el frontend envía frames de 640px de ancho y espera la respuesta antes de mandar el siguiente (un frame en vuelo como máximo). En CPU de notebook: ~500ms por frame con el modelo exportado a ONNX, ~1s con el `.pt`. Los bounding boxes se interpolan a 60fps, así que se ven fluidos aunque el modelo corra a ~2fps.
+- 🔁 **Auto-recolección:** apagada por defecto. Con el modelo actual guarda falsos positivos (una persona frente a la cámara entra como `paper` con confianza 0.9) y eso envenena el dataset. Se enciende con `AUTO_COLLECT=1` y conviene revisar las muestras antes de entrenar con ellas.
+- 🧹 **Filtros de cordura:** se descartan los boxes que cubren más del 95% del frame y los frames prácticamente uniformes (cámara tapada).
 - 🔒 **Sin auth:** CORS abierto, sin cookies. Todo el estado de usuario vive en `localStorage`.
+
+---
+
+## 💻 Correr en local
+
+**Un solo comando (Windows):** doble clic en `start-local.bat`. Levanta backend y frontend en ventanas separadas y abre el navegador. Si falta el entorno de Python o `node_modules`, los crea solo.
+
+**A mano:**
+
+```bash
+# Backend — http://localhost:8001
+cd backend
+py -3.12 -m venv .venv                      # torch no tiene wheels estables para 3.14
+.venv/Scripts/python.exe -m pip install -r requirements.txt
+.venv/Scripts/python.exe export_onnx.py     # opcional: ~2x más rápido en CPU
+.venv/Scripts/python.exe -m uvicorn main:app --port 8001
+
+# Frontend — http://localhost:5173
+cd frontend
+npm install
+npm run dev
+```
+
+En desarrollo el frontend apunta a `ws://localhost:8001/ws/detect` por defecto, así que no hace falta configurar nada. El badge sobre la cámara tiene que decir **"Conectado"** en verde.
+
+> ⚠️ Si dice **"Modo Demo"** en amarillo, el backend no está respondiendo y lo que ves en pantalla son **detecciones falsas hardcodeadas**, no el modelo. Es un fallback de presentación: a los 5 segundos sin WebSocket, el frontend simula una secuencia de residuos.
+
+**Verificar que el modelo responde de verdad:**
+
+```bash
+curl http://localhost:8001/health          # {"status":"ok","model_loaded":true}
+```
+
+**Demo desde el celular:** `getUserMedia` sólo funciona en contextos seguros, así que la IP de la LAN por HTTP no sirve — la cámara queda bloqueada. Hace falta un túnel HTTPS (ngrok/cloudflared) apuntando al frontend y al backend.
 
 ---
 

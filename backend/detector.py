@@ -1,9 +1,20 @@
+import os
+from pathlib import Path
+
 import cv2
 import numpy as np
 from ultralytics import YOLO
 
 CLASS_NAMES = ['cardboard', 'glass', 'metal', 'paper', 'plastic', 'trash']
 MIN_CONF    = 0.30   # umbral conservador — el modelo mejorará con el auto-entrenamiento
+
+# Un box que cubre el frame entero no es un residuo: es el modelo alucinando sobre
+# una escena sin nada reciclable. Medido: una persona frente a la camara devuelve
+# 'paper' con conf 0.9 y un box de 998x1000 por mil.
+MAX_BOX_AREA  = 0.95
+# Frame practicamente uniforme => camara tapada o apagada. Umbral bajo a proposito:
+# un objeto real, aunque sea liso, tiene ruido de sensor y sombras (std medido 40-60).
+MIN_FRAME_STD = 3.0
 
 CLASS_COLORS = {
     0: '#C8A96E',  # cardboard
@@ -25,9 +36,20 @@ def _preprocess(frame: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(cv2.merge((l, a, b)), cv2.COLOR_LAB2BGR)
 
 
+def resolve_model_path() -> str:
+    """MODEL_PATH si está seteado; si no, el .onnx exportado (~2x más rápido en CPU)
+    y como último recurso el .pt original."""
+    env = os.getenv('MODEL_PATH')
+    if env:
+        return env
+    onnx = Path(__file__).parent / 'Modelos' / 'best.onnx'
+    return str(onnx) if onnx.exists() else 'Modelos/best.pt'
+
+
 class TrashDetector:
-    def __init__(self, model_path: str = 'Modelos/best.pt'):
-        self.model = YOLO(model_path)
+    def __init__(self, model_path: str | None = None):
+        self.model_path = model_path or resolve_model_path()
+        self.model = YOLO(self.model_path)
         self.class_names = CLASS_NAMES
 
     def detect(self, frame_bytes: bytes, collector=None) -> list[dict]:
@@ -36,7 +58,13 @@ class TrashDetector:
         if frame is None:
             return []
 
+        # Frame plano → cámara tapada/apagada. Sin esto el modelo devuelve un box
+        # de pantalla completa con conf alta y el colector lo guarda como dato real.
+        if float(frame.std()) < MIN_FRAME_STD:
+            return []
+
         original = frame.copy()
+        fh, fw   = frame.shape[:2]
         frame    = _preprocess(frame)
 
         results    = self.model(frame, stream=True, verbose=False)
@@ -49,6 +77,9 @@ class TrashDetector:
                 cls  = int(box.cls[0])
                 conf = float(box.conf[0])
                 if conf < MIN_CONF:
+                    continue
+
+                if (x2 - x1) * (y2 - y1) > MAX_BOX_AREA * fw * fh:
                     continue
 
                 detections.append({

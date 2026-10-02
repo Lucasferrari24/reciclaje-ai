@@ -13,6 +13,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Exporta a ONNX en build: ~2x mas rapido en CPU. Si falla, el detector cae al .pt
+RUN python export_onnx.py || echo "export ONNX fallo, se usara best.pt"
+
 # Evita que ultralytics intente escribir su config en un HOME no writable
 ENV YOLO_CONFIG_DIR=/tmp/Ultralytics
 ENV MPLCONFIGDIR=/tmp/matplotlib
