@@ -21,7 +21,8 @@ echo Levantando frontend en http://localhost:5173 ...
 start "Scrap frontend" cmd /k "cd /d "%~dp0frontend" && npm run dev"
 
 echo Esperando a que el modelo cargue ...
-timeout /t 12 /nobreak >nul
+REM ping en vez de timeout: timeout falla si la entrada esta redirigida
+ping -n 14 127.0.0.1 >nul
 start http://localhost:5173
 echo.
 echo Listo. El badge de la camara debe decir "Conectado" (verde), no "Modo Demo".

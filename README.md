@@ -131,8 +131,9 @@ Aprenden mientras usan. Gamificación que convierte el reciclaje en un hábito, 
 
 **Infraestructura**
 - Vercel (frontend)
-- Render / Railway (backend)
-- Docker
+- Docker (backend; el deploy de Railway quedo caido al expirar el trial)
+
+> El backend **no esta desplegado**: el servicio de Railway se apago cuando vencio el trial, y por eso el sitio publico de Vercel corre en Modo Demo. Para una demo real hay que levantarlo en local (ver abajo) o contratar hosting.
 
 ### Detalles técnicos
 
