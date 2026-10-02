@@ -5,3 +5,5 @@ dataset/
 *.log
 .env
 runs/
+.venv/
+venv/

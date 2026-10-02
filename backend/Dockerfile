@@ -4,10 +4,18 @@ RUN apt-get update && apt-get install -y libglib2.0-0 libgl1 && rm -rf /var/lib/
 
 WORKDIR /app
 
+# Torch CPU-only: evita ~2.5 GB de wheels CUDA que ultralytics arrastraria por defecto
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
+    torch torchvision
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+
+# Evita que ultralytics intente escribir su config en un HOME no writable
+ENV YOLO_CONFIG_DIR=/tmp/Ultralytics
+ENV MPLCONFIGDIR=/tmp/matplotlib
 
 EXPOSE 8001
 

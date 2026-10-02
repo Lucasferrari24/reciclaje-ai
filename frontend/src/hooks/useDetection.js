@@ -4,6 +4,7 @@ const WS_URL = localStorage.getItem('scrap_ws_url')
   ?? import.meta.env.VITE_WS_URL
   ?? 'ws://localhost:8001/ws/detect'
 const FRAME_INTERVAL_MS = 100
+const STALE_FRAME_MS    = 3000  // si no llega respuesta en 3s, damos el frame por perdido
 const JPEG_QUALITY      = 0.92
 const SEND_WIDTH        = 640
 const WS_TIMEOUT_MS     = 5000   // si no conecta en 5s → modo demo
@@ -43,12 +44,21 @@ export function useDetection(videoRef) {
   const canvasRef   = useRef(document.createElement('canvas'))
   const scaleRef    = useRef(1)
   const sendTimeRef = useRef(null)
+  const inFlightRef = useRef(false)
   const fpsRef      = useRef({ count: 0, time: Date.now() })
 
   const captureAndSend = useCallback(() => {
     const video = videoRef.current
     const ws    = wsRef.current
     if (!video || !ws || ws.readyState !== WebSocket.OPEN) return
+
+    // Backpressure: el modelo tarda ~350ms por frame, asi que mandar a ciegas cada
+    // FRAME_INTERVAL_MS encola frames y la latencia crece sin techo. Mantenemos
+    // como maximo un frame en vuelo; si el server no contesta, lo soltamos.
+    if (inFlightRef.current) {
+      if (Date.now() - (sendTimeRef.current ?? 0) < STALE_FRAME_MS) return
+      inFlightRef.current = false
+    }
 
     const vw = video.videoWidth  || 1280
     const vh = video.videoHeight || 720
@@ -67,9 +77,14 @@ export function useDetection(videoRef) {
     ctx.drawImage(video, 0, 0, sw, sh)
 
     sendTimeRef.current = Date.now()
+    inFlightRef.current = true
     canvas.toBlob(
       (blob) => {
-        if (blob) blob.arrayBuffer().then((buf) => ws.send(buf))
+        if (!blob) { inFlightRef.current = false; return }
+        blob.arrayBuffer().then((buf) => {
+          if (ws.readyState === WebSocket.OPEN) ws.send(buf)
+          else inFlightRef.current = false
+        })
       },
       'image/jpeg',
       JPEG_QUALITY
@@ -79,6 +94,7 @@ export function useDetection(videoRef) {
   useEffect(() => {
     setDetections([])
     setDemoMode(false)
+    inFlightRef.current = false
     fpsRef.current = { count: 0, time: Date.now() }
 
     let usedDemo = false
@@ -114,6 +130,7 @@ export function useDetection(videoRef) {
     }
 
     ws.onmessage = (event) => {
+      inFlightRef.current = false
       if (sendTimeRef.current) setLatency(Date.now() - sendTimeRef.current)
       fpsRef.current.count++
       const now = Date.now()
