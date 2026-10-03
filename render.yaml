@@ -1,0 +1,20 @@
+# Blueprint de Render para el backend. Se aplica desde el dashboard con
+# New > Blueprint apuntando a este repo; Render lee este archivo y crea el servicio.
+services:
+  - type: web
+    name: scrap-backend
+    runtime: docker
+    plan: free
+    # Virginia es la region de Render mas cercana a Rosario: en una app de WebSocket
+    # en tiempo real cada salto de latencia se nota en el ida y vuelta de cada frame.
+    region: virginia
+    # Rutas relativas a la raiz del repo; el contexto es backend/ para que el
+    # `COPY requirements.txt .` del Dockerfile resuelva.
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    envVars:
+      # La auto-recoleccion guarda falsos positivos con el modelo actual, y en Render
+      # el disco es efimero igual: lo recolectado se perderia en cada deploy.
+      - key: AUTO_COLLECT
+        value: "0"

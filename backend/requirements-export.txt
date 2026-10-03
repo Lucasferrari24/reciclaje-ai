@@ -1,0 +1,5 @@
+# Solo para exportar Modelos/best.pt -> best.onnx (python export_onnx.py).
+# No va al runtime: lo usa unicamente la etapa 'exporter' del Dockerfile.
+# torch se instala aparte desde el indice CPU para no bajar ~2.5 GB de wheels CUDA.
+ultralytics
+onnx

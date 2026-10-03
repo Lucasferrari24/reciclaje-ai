@@ -1,9 +1,11 @@
+# Runtime: solo lo que necesita servir inferencia. torch y ultralytics quedaron
+# fuera a proposito — el detector corre el ONNX con onnxruntime directo, lo que
+# baja la imagen de ~2 GB a ~250 MB y la RAM de ~476 MB a ~181 MB.
+# Para reexportar el ONNX desde el .pt hace falta requirements-export.txt.
 fastapi
 uvicorn[standard]
-ultralytics
 opencv-python-headless
 numpy
+onnxruntime
 websockets
 python-multipart
-onnx
-onnxruntime
